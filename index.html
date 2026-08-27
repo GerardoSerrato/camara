@@ -151,54 +151,119 @@
     const statusDiv = document.getElementById('status');
     const btnCapture = document.getElementById('btn-capture');
     const btnReset = document.getElementById('btn-reset');
+    const inspectionZone = document.getElementById('inspection-zone');
 
     let examplePattern = null;
     let isProcessing = false;
-    const threshold = 50; // Sensibilidad de la comparación (0-255)
+    
+    // Umbral de sensibilidad: menor número = más estricto (prueba entre 15 y 30)
+    const threshold = 22; 
 
-    // 1. Configurar la cámara (trasera si es posible)
     async function setupCamera() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { faccingMode: "environment" },
+                video: { facingMode: { exact: "environment" } },
                 audio: false
             });
             video.srcObject = stream;
         } catch (err) {
-            console.error("Error al acceder a la cámara:", err);
-            statusDiv.textContent = "ERROR DE CÁMARA";
-            statusDiv.className = "status-fail";
+            try {
+                const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    audio: false
+                });
+                video.srcObject = fallbackStream;
+            } catch (fallbackErr) {
+                statusDiv.textContent = "ERROR DE CÁMARA";
+                statusDiv.className = "status-fail";
+            }
         }
     }
 
-    // 2. Función de captura del ejemplo
-// 1. Configurar la cámara trasera con constraint estricto
-async function setupCamera() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
-                facingMode: { exact: "environment" } // "exact" fuerza la cámara trasera
-            },
-            audio: false
-        });
-        video.srcObject = stream;
-    } catch (err) {
-        // Fallback en caso de que 'exact' falle en algunos navegadores móviles
-        try {
-            const fallbackStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" },
-                audio: false
-            });
-            video.srcObject = fallbackStream;
-        } catch (fallbackErr) {
-            console.error("Error al acceder a la cámara:", fallbackErr);
-            statusDiv.textContent = "ERROR DE CÁMARA";
-            statusDiv.className = "status-fail";
-        }
-    }
-}
+    // Calcula el recorte exacto considerando el escalado 'cover'
+    function getInspectionZoneData() {
+        if (!video.videoWidth || !video.videoHeight) return null;
 
-    // 3. Reiniciar el sistema
+        const containerRect = container.getBoundingClientRect();
+        const zoneRect = inspectionZone.getBoundingClientRect();
+
+        const videoRatio = video.videoWidth / video.videoHeight;
+        const containerRatio = containerRect.width / containerRect.height;
+
+        let renderedWidth, renderedHeight, offsetX, offsetY;
+
+        if (containerRatio > videoRatio) {
+            renderedWidth = containerRect.width;
+            renderedHeight = containerRect.width / videoRatio;
+            offsetX = 0;
+            offsetY = (renderedHeight - containerRect.height) / 2;
+        } else {
+            renderedWidth = containerRect.height * videoRatio;
+            renderedHeight = containerRect.height;
+            offsetX = (renderedWidth - containerRect.width) / 2;
+            offsetY = 0;
+        }
+
+        const scale = video.videoWidth / renderedWidth;
+        const x = (zoneRect.left - containerRect.left + offsetX) * scale;
+        const y = (zoneRect.top - containerRect.top + offsetY) * scale;
+        const width = zoneRect.width * scale;
+        const height = zoneRect.height * scale;
+
+        // Extraer los píxeles de la zona central
+        return ctx.getImageData(
+            Math.max(0, Math.floor(x)), 
+            Math.max(0, Math.floor(y)), 
+            Math.floor(width), 
+            Math.floor(height)
+        );
+    }
+
+    // Extrae un vector de características (promedio + desviación de brillo)
+    function extractFeatures(imageData) {
+        if (!imageData) return null;
+        const data = imageData.data;
+        let r = 0, g = 0, b = 0, brightnessTotal = 0;
+        const totalPixels = data.length / 4;
+
+        for (let i = 0; i < data.length; i += 4) {
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+            brightnessTotal += (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+        }
+
+        const avgBrightness = brightnessTotal / totalPixels;
+        let variance = 0;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const pixelBrightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+            variance += Math.pow(pixelBrightness - avgBrightness, 2);
+        }
+
+        return {
+            r: r / totalPixels,
+            g: g / totalPixels,
+            b: b / totalPixels,
+            stdDev: Math.sqrt(variance / totalPixels) // Detecta relieves y texturas
+        };
+    }
+
+    function captureExample() {
+        if (!video.videoWidth) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const zoneData = getInspectionZoneData();
+        examplePattern = extractFeatures(zoneData);
+
+        statusDiv.textContent = "EJEMPLO CAPTURADO";
+        statusDiv.className = "status-ok";
+        btnCapture.textContent = "Recapturar Ejemplo";
+    }
+
     function resetSystem() {
         examplePattern = null;
         statusDiv.textContent = "ESPERANDO EJEMPLO";
@@ -207,104 +272,52 @@ async function setupCamera() {
         container.classList.remove('rejected');
     }
 
-    // 4. Bucle principal de procesamiento (la "emulación de hardware")
     function processFrame() {
-        if (!isProcessing) return;
-
-        // Ajustar el canvas si ha cambiado el tamaño del video
-        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-        }
-
-        // Dibujar el frame del video en el canvas (necesario para leer píxeles)
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Si tenemos un patrón, comparar
-        if (examplePattern) {
-            const currentZoneData = getInspectionZoneData();
-            const currentAverage = calculateAverageColor(currentZoneData);
-
-            if (isPixelDataSimilar(examplePattern, currentAverage, threshold)) {
-                // Moneda OK: Sin filtro, estado verde
-                container.classList.remove('rejected');
-                statusDiv.textContent = "MONEDA OK";
-                statusDiv.className = "status-ok";
-            } else {
-                // Moneda DEFECTUOSA: Aplicar filtro naranja, estado rojo
-                container.classList.add('rejected');
-                statusDiv.textContent = "RECHAZADA (DIFERENTE)";
-                statusDiv.className = "status-fail";
+        if (isProcessing && video.readyState === video.HAVE_ENOUGH_DATA) {
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
             }
-        } else {
-            container.classList.remove('rejected');
-        }
 
-        // Solicitar el siguiente frame lo antes posible (simulando paralelismo)
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            if (examplePattern) {
+                const currentData = getInspectionZoneData();
+                const currentFeatures = extractFeatures(currentData);
+
+                if (currentFeatures) {
+                    const diffR = Math.abs(examplePattern.r - currentFeatures.r);
+                    const diffG = Math.abs(examplePattern.g - currentFeatures.g);
+                    const diffB = Math.abs(examplePattern.b - currentFeatures.b);
+                    const diffTexture = Math.abs(examplePattern.stdDev - currentFeatures.stdDev);
+
+                    // Puntuación combinada de color y textura/relieve
+                    const totalError = (diffR + diffG + diffB) / 3 + diffTexture;
+
+                    if (totalError < threshold) {
+                        container.classList.remove('rejected');
+                        statusDiv.textContent = `OK (Error: ${Math.round(totalError)})`;
+                        statusDiv.className = "status-ok";
+                    } else {
+                        container.classList.add('rejected');
+                        statusDiv.textContent = `RECHAZO (Error: ${Math.round(totalError)})`;
+                        statusDiv.className = "status-fail";
+                    }
+                }
+            }
+        }
         requestAnimationFrame(processFrame);
     }
 
-    // --- Funciones auxiliares de visión computacional ---
-
-    function getInspectionZoneData() {
-        // Calcular la posición y tamaño de la zona de inspección relativa al video
-        const videoRect = video.getBoundingClientRect();
-        const zoneRect = document.getElementById('inspection-zone').getBoundingClientRect();
-        
-        const scaleX = video.videoWidth / videoRect.width;
-        const scaleY = video.videoHeight / videoRect.height;
-
-        const x = (zoneRect.left - videoRect.left) * scaleX;
-        const y = (zoneRect.top - videoRect.top) * scaleY;
-        const width = zoneRect.width * scaleX;
-        const height = zoneRect.height * scaleY;
-
-        // Leer los datos de píxeles (RGBA)
-        return ctx.getImageData(x, y, width, height);
-    }
-
-    function calculateAverageColor(imageData) {
-        const data = imageData.data;
-        let r = 0, g = 0, b = 0;
-        const totalPixels = data.length / 4;
-
-        for (let i = 0; i < data.length; i += 4) {
-            r += data[i];     // Red
-            g += data[i + 1]; // Green
-            b += data[i + 2]; // Blue
-        }
-
-        return {
-            r: Math.round(r / totalPixels),
-            g: Math.round(g / totalPixels),
-            b: Math.round(b / totalPixels)
-        };
-    }
-
-    function isPixelDataSimilar(pattern, current, threshold) {
-        // Una comparación muy simple: diferencia total de color (Euclidiana simplificada)
-        const diffR = Math.abs(pattern.r - current.r);
-        const diffG = Math.abs(pattern.g - current.g);
-        const diffB = Math.abs(pattern.b - current.b);
-        
-        const totalDiff = (diffR + diffG + diffB) / 3;
-        
-        return totalDiff < threshold;
-    }
-
-    // --- Eventos y arranque ---
-
     video.addEventListener('play', () => {
         isProcessing = true;
-        processFrame(); // Iniciar el bucle de procesamiento
+        processFrame();
     });
 
     btnCapture.addEventListener('click', captureExample);
     btnReset.addEventListener('click', resetSystem);
 
     setupCamera();
-
 </script>
-
 </body>
 </html>
