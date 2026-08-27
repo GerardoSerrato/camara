@@ -172,25 +172,31 @@
     }
 
     // 2. Función de captura del ejemplo
-    function captureExample() {
-        if (!isProcessing) return;
-
-        // Ajustar el canvas al tamaño del video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Dibujar el frame actual en el canvas
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Obtener los datos del patrón de la zona de inspección
-        const zoneData = getInspectionZoneData();
-        examplePattern = calculateAverageColor(zoneData);
-        
-        console.log("Patrón capturado:", examplePattern);
-        statusDiv.textContent = "EJEMPLO CAPTURADO";
-        statusDiv.className = "status-ok";
-        btnCapture.textContent = "Recapturar Ejemplo";
+// 1. Configurar la cámara trasera con constraint estricto
+async function setupCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+                facingMode: { exact: "environment" } // "exact" fuerza la cámara trasera
+            },
+            audio: false
+        });
+        video.srcObject = stream;
+    } catch (err) {
+        // Fallback en caso de que 'exact' falle en algunos navegadores móviles
+        try {
+            const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" },
+                audio: false
+            });
+            video.srcObject = fallbackStream;
+        } catch (fallbackErr) {
+            console.error("Error al acceder a la cámara:", fallbackErr);
+            statusDiv.textContent = "ERROR DE CÁMARA";
+            statusDiv.className = "status-fail";
+        }
     }
+}
 
     // 3. Reiniciar el sistema
     function resetSystem() {
