@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Emulación FPGA: Control de Calidad de Monedas</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: #333;
+            width: 100%;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; }
+        p { margin: 5px 0 0; font-size: 0.9rem; color: #aaa; }
+
+        #container {
+            position: relative;
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Importante para llenar la pantalla */
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Dejar pasar los clics */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* El área de inspección "hardcoded" */
+        #inspection-zone {
+            width: 150px;
+            height: 150px;
+            border: 4px solid cyan;
+            border-radius: 50%;
+            box-shadow: 0 0 15px cyan;
+        }
+
+        #controls {
+            width: 100%;
+            padding: 20px;
+            background-color: #333;
+            display: flex;
+            justify-content: space-around;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.5);
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #btn-capture { background-color: #007bff; color: white; }
+        #btn-capture:hover { background-color: #0056b3; }
+
+        #btn-reset { background-color: #6c757d; color: white; }
+        #btn-reset:hover { background-color: #5a6268; }
+
+        /* Estilo para el estado de error (Rechazo) */
+        #container.rejected #inspection-zone {
+            border-color: orange;
+            box-shadow: 0 0 25px orange;
+        }
+
+        #container.rejected canvas {
+            filter: sepia(1) saturate(5) hue-rotate(-50deg); /* Filtro naranja */
+        }
+
+        #status {
+            position: absolute;
+            bottom: 80px;
+            left: 20px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+        
+        .status-idle { background-color: #555; }
+        .status-ok { background-color: #28a745; }
+        .status-fail { background-color: #dc3545; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Emulador FPGA: Inspector de Monedas</h1>
+    <p>Coloca la moneda en el círculo</p>
+</header>
+
+<div id="container">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    
+    <div id="overlay">
+        <div id="inspection-zone"></div>
+    </div>
+    
+    <div id="status" class="status-idle">ESPERANDO EJEMPLO</div>
+</div>
+
+<div id="controls">
+    <button id="btn-capture">Capturar Ejemplo</button>
+    <button id="btn-reset">Reiniciar</button>
+</div>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const container = document.getElementById('container');
+    const statusDiv = document.getElementById('status');
+    const btnCapture = document.getElementById('btn-capture');
+    const btnReset = document.getElementById('btn-reset');
+
+    let examplePattern = null;
+    let isProcessing = false;
+    const threshold = 50; // Sensibilidad de la comparación (0-255)
+
+    // 1. Configurar la cámara (trasera si es posible)
+    async function setupCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { faccingMode: "environment" },
+                audio: false
+            });
+            video.srcObject = stream;
+        } catch (err) {
+            console.error("Error al acceder a la cámara:", err);
+            statusDiv.textContent = "ERROR DE CÁMARA";
+            statusDiv.className = "status-fail";
+        }
+    }
+
+    // 2. Función de captura del ejemplo
+    function captureExample() {
+        if (!isProcessing) return;
+
+        // Ajustar el canvas al tamaño del video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Dibujar el frame actual en el canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Obtener los datos del patrón de la zona de inspección
+        const zoneData = getInspectionZoneData();
+        examplePattern = calculateAverageColor(zoneData);
+        
+        console.log("Patrón capturado:", examplePattern);
+        statusDiv.textContent = "EJEMPLO CAPTURADO";
+        statusDiv.className = "status-ok";
+        btnCapture.textContent = "Recapturar Ejemplo";
+    }
+
+    // 3. Reiniciar el sistema
+    function resetSystem() {
+        examplePattern = null;
+        statusDiv.textContent = "ESPERANDO EJEMPLO";
+        statusDiv.className = "status-idle";
+        btnCapture.textContent = "Capturar Ejemplo";
+        container.classList.remove('rejected');
+    }
+
+    // 4. Bucle principal de procesamiento (la "emulación de hardware")
+    function processFrame() {
+        if (!isProcessing) return;
+
+        // Ajustar el canvas si ha cambiado el tamaño del video
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+        }
+
+        // Dibujar el frame del video en el canvas (necesario para leer píxeles)
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Si tenemos un patrón, comparar
+        if (examplePattern) {
+            const currentZoneData = getInspectionZoneData();
+            const currentAverage = calculateAverageColor(currentZoneData);
+
+            if (isPixelDataSimilar(examplePattern, currentAverage, threshold)) {
+                // Moneda OK: Sin filtro, estado verde
+                container.classList.remove('rejected');
+                statusDiv.textContent = "MONEDA OK";
+                statusDiv.className = "status-ok";
+            } else {
+                // Moneda DEFECTUOSA: Aplicar filtro naranja, estado rojo
+                container.classList.add('rejected');
+                statusDiv.textContent = "RECHAZADA (DIFERENTE)";
+                statusDiv.className = "status-fail";
+            }
+        } else {
+            container.classList.remove('rejected');
+        }
+
+        // Solicitar el siguiente frame lo antes posible (simulando paralelismo)
+        requestAnimationFrame(processFrame);
+    }
+
+    // --- Funciones auxiliares de visión computacional ---
+
+    function getInspectionZoneData() {
+        // Calcular la posición y tamaño de la zona de inspección relativa al video
+        const videoRect = video.getBoundingClientRect();
+        const zoneRect = document.getElementById('inspection-zone').getBoundingClientRect();
+        
+        const scaleX = video.videoWidth / videoRect.width;
+        const scaleY = video.videoHeight / videoRect.height;
+
+        const x = (zoneRect.left - videoRect.left) * scaleX;
+        const y = (zoneRect.top - videoRect.top) * scaleY;
+        const width = zoneRect.width * scaleX;
+        const height = zoneRect.height * scaleY;
+
+        // Leer los datos de píxeles (RGBA)
+        return ctx.getImageData(x, y, width, height);
+    }
+
+    function calculateAverageColor(imageData) {
+        const data = imageData.data;
+        let r = 0, g = 0, b = 0;
+        const totalPixels = data.length / 4;
+
+        for (let i = 0; i < data.length; i += 4) {
+            r += data[i];     // Red
+            g += data[i + 1]; // Green
+            b += data[i + 2]; // Blue
+        }
+
+        return {
+            r: Math.round(r / totalPixels),
+            g: Math.round(g / totalPixels),
+            b: Math.round(b / totalPixels)
+        };
+    }
+
+    function isPixelDataSimilar(pattern, current, threshold) {
+        // Una comparación muy simple: diferencia total de color (Euclidiana simplificada)
+        const diffR = Math.abs(pattern.r - current.r);
+        const diffG = Math.abs(pattern.g - current.g);
+        const diffB = Math.abs(pattern.b - current.b);
+        
+        const totalDiff = (diffR + diffG + diffB) / 3;
+        
+        return totalDiff < threshold;
+    }
+
+    // --- Eventos y arranque ---
+
+    video.addEventListener('play', () => {
+        isProcessing = true;
+        processFrame(); // Iniciar el bucle de procesamiento
+    });
+
+    btnCapture.addEventListener('click', captureExample);
+    btnReset.addEventListener('click', resetSystem);
+
+    setupCamera();
+
+</script>
+
+</body>
+</html>
