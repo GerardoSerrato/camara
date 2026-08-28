@@ -3,494 +3,401 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Cobro e Inspección de Monedas</title>
+    <title>Pipeline de Visión Industrial: Clasificación y Cobro</title>
     <style>
-        * {
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
         body {
             background-color: #121212;
-            color: #e0e0e0;
+            color: #ececec;
             margin: 0;
-            padding: 16px;
-            overflow-y: auto; /* Scroll vertical habilitado */
+            padding: 14px;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 16px;
         }
-
-        h2 {
-            margin-top: 0;
-            font-size: 1.15rem;
-            color: #4dabf7;
-            border-bottom: 1px solid #333;
-            padding-bottom: 8px;
-        }
-
+        h2 { margin: 0 0 10px 0; font-size: 1.05rem; color: #38bdf8; border-bottom: 1px solid #2a2a2a; padding-bottom: 6px; }
         .card {
-            background-color: #1e1e1e;
+            background: #1c1c1e;
             border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            padding: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
-
-        .input-group {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-
-        input {
-            background-color: #2b2b2b;
-            border: 1px solid #444;
-            color: #fff;
-            padding: 10px;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            flex: 1;
-        }
-
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        button:active {
-            opacity: 0.8;
-        }
-
-        .btn-danger {
-            background-color: #dc3545;
-            padding: 4px 10px;
-        }
-
-        .btn-success {
-            background-color: #28a745;
-        }
-
-        .btn-secondary {
-            background-color: #495057;
-        }
-
-        ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        li {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #262626;
-            padding: 10px 12px;
-            border-radius: 6px;
-        }
-
-        /* Contenedor de la cámara */
-        #camera-wrapper {
+        .camera-box {
             position: relative;
             width: 100%;
-            height: 280px;
-            background-color: #000;
-            border-radius: 10px;
+            height: 240px;
+            background: #000;
+            border-radius: 8px;
             overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
         }
-
         video, canvas {
             position: absolute;
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-
-        #inspection-zone {
+        .roi-circle {
             position: absolute;
-            width: 110px;
-            height: 110px;
+            width: 90px;
+            height: 90px;
             border: 3px solid #00e5ff;
             border-radius: 50%;
-            box-shadow: 0 0 12px #00e5ff;
             pointer-events: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 0 10px #00e5ff;
         }
-
-        #camera-wrapper.rejected #inspection-zone {
-            border-color: orange;
-            box-shadow: 0 0 20px orange;
+        .input-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
         }
-
-        #camera-wrapper.rejected canvas {
-            filter: sepia(1) saturate(6) hue-rotate(-50deg);
+        input, select {
+            background: #2c2c2e;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            flex: 1;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 9px 14px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        button:active { opacity: 0.8; }
+        .btn-green { background: #16a34a; }
+        .btn-orange { background: #ea580c; }
+        .btn-red { background: #dc2626; padding: 3px 8px; font-size: 0.75rem; }
+        
+        ul { list-style: none; padding: 0; margin: 10px 0 0 0; display: flex; flex-direction: column; gap: 6px; }
+        li {
+            background: #27272a;
+            padding: 6px 10px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
         }
 
         .dashboard {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 12px;
+            gap: 8px;
+            margin-top: 10px;
         }
-
-        .metric {
-            background-color: #262626;
-            padding: 12px;
+        .metric-box {
+            background: #27272a;
+            padding: 10px;
             border-radius: 8px;
             text-align: center;
         }
-
-        .metric span {
-            display: block;
-            font-size: 0.8rem;
-            color: #aaa;
-        }
-
-        .metric strong {
-            font-size: 1.25rem;
-            color: #fff;
-        }
-
-        #balance-status {
+        .metric-box span { display: block; font-size: 0.75rem; color: #9ca3af; }
+        .metric-box strong { font-size: 1.15rem; color: #fff; }
+        
+        #final-status {
             grid-column: span 2;
-            padding: 12px;
-            border-radius: 8px;
+            padding: 10px;
+            border-radius: 6px;
             text-align: center;
             font-weight: bold;
-            font-size: 1rem;
+            font-size: 0.95rem;
         }
-
-        .status-covered { background-color: #1b5e20; color: #a5d6a7; }
-        .status-missing { background-color: #b71c1c; color: #ffcdd2; }
-        .status-exact { background-color: #0d47a1; color: #bbdefb; }
+        .st-ok { background: #14532d; color: #86efac; }
+        .st-fail { background: #7f1d1d; color: #fca5a5; }
+        .st-idle { background: #374151; color: #d1d5db; }
     </style>
 </head>
 <body>
 
-    <!-- SECCIÓN 1: CARRITO DE PRODUCTOS -->
+    <!-- PASO 1: CALIBRACIÓN INDIVIDUAL DE PATRONES -->
     <div class="card">
-        <h2>1. Productos a Cobrar</h2>
-        <div class="input-group">
-            <input type="text" id="prod-name" placeholder="Nombre (ej. Café)">
-            <input type="number" id="prod-price" placeholder="Precio ($)" style="max-width: 110px;">
-            <button id="btn-add-prod">Agregar</button>
+        <h2>1. Calibración de Patrones (1 a 1)</h2>
+        <div class="camera-box">
+            <video id="v-calib" autoplay playsinline muted></video>
+            <canvas id="c-calib"></canvas>
+            <div class="roi-circle"></div>
         </div>
-        <ul id="product-list"></ul>
+        <div class="input-row">
+            <select id="pat-type">
+                <option value="producto">Producto</option>
+                <option value="moneda">Moneda</option>
+            </select>
+            <input type="text" id="pat-name" placeholder="Nombre (ej. Goma, $5)">
+            <input type="number" id="pat-val" placeholder="Valor $" style="max-width: 80px;">
+        </div>
+        <button id="btn-save-pat" class="btn-green" style="width: 100%; margin-top: 8px;">Calibrar y Guardar Objeto</button>
+        <ul id="patterns-list"></ul>
     </div>
 
-    <!-- SECCIÓN 2: CALIBRACIÓN DE MONEDAS PATRÓN -->
+    <!-- PASO 2: ESCANEO MULTI-PRODUCTO (TODO EN LA ESCENA) -->
     <div class="card">
-        <h2>2. Registrar Moneda de Ejemplo</h2>
-        <div class="input-group">
-            <input type="number" id="coin-value" placeholder="Valor ($ ej. 1, 2, 5, 10)">
-            <button id="btn-save-coin" class="btn-success">Guardar Patrón</button>
+        <h2>2. Escaneo de Productos en Conjunto</h2>
+        <div class="camera-box">
+            <canvas id="c-prod"></canvas>
         </div>
-        <p style="font-size: 0.8rem; color: #888; margin: 0 0 8px 0;">Patrones registrados:</p>
-        <ul id="coin-patterns-list"></ul>
+        <button id="btn-scan-prod" style="width: 100%; margin-top: 8px;">Escanear Escena de Productos</button>
+        <ul id="detected-prod-list"></ul>
     </div>
 
-    <!-- SECCIÓN 3: ESCÁNER / INSPECTOR FPGA -->
+    <!-- PASO 3: ESCANEO MULTI-MONEDA Y COMPARACIÓN -->
     <div class="card">
-        <h2>3. Escaneo e Inspección</h2>
-        <div id="camera-wrapper">
-            <video id="video" autoplay playsinline muted></video>
-            <canvas id="canvas"></canvas>
-            <div id="inspection-zone"></div>
+        <h2>3. Escaneo de Monedas en Conjunto</h2>
+        <div class="camera-box">
+            <canvas id="c-coin"></canvas>
         </div>
+        <button id="btn-scan-coin" class="btn-orange" style="width: 100%; margin-top: 8px;">Escanear Monedas y Validar</button>
+        <ul id="detected-coin-list"></ul>
 
-        <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <button id="btn-accept-coin" class="btn-success" style="flex: 2;">Aceptar Moneda Actual</button>
-            <button id="btn-reset-scanned" class="btn-secondary" style="flex: 1;">Vaciar Caja</button>
-        </div>
-
+        <!-- DASHBOARD DE TOTALES -->
         <div class="dashboard">
-            <div class="metric">
-                <span>Total Productos</span>
-                <strong id="total-products">$0.00</strong>
+            <div class="metric-box">
+                <span>Total a Pagar</span>
+                <strong id="total-prods">$0.00</strong>
             </div>
-            <div class="metric">
+            <div class="metric-box">
                 <span>Total Monedas</span>
-                <strong id="total-scanned">$0.00</strong>
+                <strong id="total-coins">$0.00</strong>
             </div>
-            <div id="balance-status" class="status-missing">Falta dinero: $0.00</div>
+            <div id="final-status" class="st-idle">Sin escaneos activos</div>
         </div>
     </div>
 
 <script>
-    // --- ESTADO GLOBAL ---
-    let products = [];
-    let coinPatterns = []; // { id, value, features }
-    let scannedTotal = 0;
-    let detectedCoin = null;
+    let patterns = []; // { id, type, name, value, r, g, b, stdDev }
+    let totalProductsCost = 0;
+    let totalCoinsValue = 0;
 
-    const threshold = 26; // Sensibilidad de textura/color
+    const thresholdQuality = 35; // Umbral de rechazo / calidad
 
-    // --- ELEMENTOS DOM ---
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const cameraWrapper = document.getElementById('camera-wrapper');
-    const inspectionZone = document.getElementById('inspection-zone');
+    const vCalib = document.getElementById('v-calib');
+    const cCalib = document.getElementById('c-calib');
+    const cProd = document.getElementById('c-prod');
+    const cCoin = document.getElementById('c-coin');
 
-    // --- 1. CONFIGURACIÓN DE CÁMARA TRASERA ---
-    async function initCamera() {
+    // Inicializar Cámara Trasera
+    async function startCamera() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: { exact: "environment" } },
                 audio: false
             });
-            video.srcObject = stream;
-        } catch (err) {
-            const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            vCalib.srcObject = stream;
+        } catch {
+            const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: "environment" },
                 audio: false
             });
-            video.srcObject = fallbackStream;
+            vCalib.srcObject = stream;
         }
     }
 
-    // --- 2. PIPELINE DE EXTRACCIÓN DE CARACTERÍSTICAS ---
-    function getInspectionZoneData() {
-        if (!video.videoWidth) return null;
-
-        const wrapperRect = cameraWrapper.getBoundingClientRect();
-        const zoneRect = inspectionZone.getBoundingClientRect();
-
-        const videoRatio = video.videoWidth / video.videoHeight;
-        const wrapperRatio = wrapperRect.width / wrapperRect.height;
-
-        let renderedWidth, renderedHeight, offsetX, offsetY;
-
-        if (wrapperRatio > videoRatio) {
-            renderedWidth = wrapperRect.width;
-            renderedHeight = wrapperRect.width / videoRatio;
-            offsetX = 0;
-            offsetY = (renderedHeight - wrapperRect.height) / 2;
-        } else {
-            renderedWidth = wrapperRect.height * videoRatio;
-            renderedHeight = wrapperRect.height;
-            offsetX = (renderedWidth - wrapperRect.width) / 2;
-            offsetY = 0;
-        }
-
-        const scale = video.videoWidth / renderedWidth;
-        const x = (zoneRect.left - wrapperRect.left + offsetX) * scale;
-        const y = (zoneRect.top - wrapperRect.top + offsetY) * scale;
-        const width = zoneRect.width * scale;
-        const height = zoneRect.height * scale;
-
-        return ctx.getImageData(
-            Math.max(0, Math.floor(x)), 
-            Math.max(0, Math.floor(y)), 
-            Math.floor(width), 
-            Math.floor(height)
-        );
+    // 1. EXTRACCIÓN DE DESCRIPTORES DEL CÍRCULO CENTRAL (CALIBRACIÓN)
+    function extractROI(ctx, width, height) {
+        const size = Math.min(width, height) * 0.35;
+        const startX = (width - size) / 2;
+        const startY = (height - size) / 2;
+        const imgData = ctx.getImageData(startX, startY, size, size);
+        return computeFeatures(imgData);
     }
 
-    function extractFeatures(imageData) {
-        if (!imageData) return null;
-        const data = imageData.data;
-        let r = 0, g = 0, b = 0, brightnessTotal = 0;
-        const totalPixels = data.length / 4;
+    function computeFeatures(imgData) {
+        const d = imgData.data;
+        let r = 0, g = 0, b = 0, lum = 0;
+        const n = d.length / 4;
+        if (n === 0) return null;
 
-        for (let i = 0; i < data.length; i += 4) {
-            r += data[i];
-            g += data[i + 1];
-            b += data[i + 2];
-            brightnessTotal += (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+        for (let i = 0; i < d.length; i += 4) {
+            r += d[i]; g += d[i+1]; b += d[i+2];
+            lum += (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
         }
-
-        const avgBrightness = brightnessTotal / totalPixels;
+        const avgLum = lum / n;
         let variance = 0;
-
-        for (let i = 0; i < data.length; i += 4) {
-            const pb = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-            variance += Math.pow(pb - avgBrightness, 2);
+        for (let i = 0; i < d.length; i += 4) {
+            const l = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
+            variance += Math.pow(l - avgLum, 2);
         }
-
         return {
-            r: r / totalPixels,
-            g: g / totalPixels,
-            b: b / totalPixels,
-            stdDev: Math.sqrt(variance / totalPixels)
+            r: r / n,
+            g: g / n,
+            b: b / n,
+            stdDev: Math.sqrt(variance / n)
         };
     }
 
-    // --- 3. BUCLE DE PROCESAMIENTO DETERMINISTA ---
-    function processInspection() {
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-            }
+    // GUARDAR PATRÓN
+    document.getElementById('btn-save-pat').addEventListener('click', () => {
+        const type = document.getElementById('pat-type').value;
+        const name = document.getElementById('pat-name').value.trim();
+        const val = parseFloat(document.getElementById('pat-val').value);
 
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        if (!name || isNaN(val)) return alert("Completa el nombre y valor.");
 
-            const currentData = getInspectionZoneData();
-            const currentFeatures = extractFeatures(currentData);
+        cCalib.width = vCalib.videoWidth;
+        cCalib.height = vCalib.videoHeight;
+        const ctx = cCalib.getContext('2d');
+        ctx.drawImage(vCalib, 0, 0);
 
-            if (currentFeatures && coinPatterns.length > 0) {
-                let bestMatch = null;
-                let lowestError = Infinity;
+        const feat = extractROI(ctx, cCalib.width, cCalib.height);
+        if (!feat) return;
 
-                for (let pattern of coinPatterns) {
-                    const diffR = Math.abs(pattern.features.r - currentFeatures.r);
-                    const diffG = Math.abs(pattern.features.g - currentFeatures.g);
-                    const diffB = Math.abs(pattern.features.b - currentFeatures.b);
-                    const diffTexture = Math.abs(pattern.features.stdDev - currentFeatures.stdDev);
-
-                    const totalError = (diffR + diffG + diffB) / 3 + diffTexture;
-
-                    if (totalError < lowestError) {
-                        lowestError = totalError;
-                        bestMatch = pattern;
-                    }
-                }
-
-                if (lowestError < threshold) {
-                    // Moneda válida identificada
-                    cameraWrapper.classList.remove('rejected');
-                    detectedCoin = bestMatch;
-                } else {
-                    // Moneda rechazada / sin coincidencia
-                    cameraWrapper.classList.add('rejected');
-                    detectedCoin = null;
-                }
-            } else {
-                cameraWrapper.classList.remove('rejected');
-                detectedCoin = null;
-            }
-        }
-        requestAnimationFrame(processInspection);
-    }
-
-    // --- 4. GESTIÓN DE PRODUCTOS Y TOTALES ---
-    document.getElementById('btn-add-prod').addEventListener('click', () => {
-        const nameInput = document.getElementById('prod-name');
-        const priceInput = document.getElementById('prod-price');
-        const name = nameInput.value.trim();
-        const price = parseFloat(priceInput.value);
-
-        if (!name || isNaN(price) || price <= 0) return;
-
-        products.push({ id: Date.now(), name, price });
-        nameInput.value = '';
-        priceInput.value = '';
-        renderProducts();
-        updateBalance();
+        patterns.push({ id: Date.now(), type, name, value: val, ...feat });
+        document.getElementById('pat-name').value = '';
+        document.getElementById('pat-val').value = '';
+        renderPatterns();
     });
 
-    function renderProducts() {
-        const list = document.getElementById('product-list');
+    function renderPatterns() {
+        const list = document.getElementById('patterns-list');
         list.innerHTML = '';
-        products.forEach(p => {
+        patterns.forEach(p => {
             const li = document.createElement('li');
             li.innerHTML = `
-                <span>${p.name} - <strong>$${p.price.toFixed(2)}</strong></span>
-                <button class="btn-danger" onclick="removeProduct(${p.id})">✕</button>
-            `;
-            list.appendChild(li);
-        });
-    }
-
-    window.removeProduct = function(id) {
-        products = products.filter(p => p.id !== id);
-        renderProducts();
-        updateBalance();
-    };
-
-    // --- 5. REGISTRO DE MONEDAS PATRÓN ---
-    document.getElementById('btn-save-coin').addEventListener('click', () => {
-        const valInput = document.getElementById('coin-value');
-        const val = parseFloat(valInput.value);
-
-        if (isNaN(val) || val <= 0) return;
-
-        const zoneData = getInspectionZoneData();
-        const features = extractFeatures(zoneData);
-
-        if (features) {
-            coinPatterns.push({ id: Date.now(), value: val, features });
-            valInput.value = '';
-            renderCoinPatterns();
-        }
-    });
-
-    function renderCoinPatterns() {
-        const list = document.getElementById('coin-patterns-list');
-        list.innerHTML = '';
-        coinPatterns.forEach(c => {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <span>Patrón Moneda: <strong>$${c.value.toFixed(2)}</strong></span>
-                <button class="btn-danger" onclick="removePattern(${c.id})">✕</button>
+                <span>[${p.type.toUpperCase()}] <strong>${p.name}</strong> - $${p.value.toFixed(2)}</span>
+                <button class="btn-red" onclick="removePattern(${p.id})">✕</button>
             `;
             list.appendChild(li);
         });
     }
 
     window.removePattern = function(id) {
-        coinPatterns = coinPatterns.filter(c => c.id !== id);
-        renderCoinPatterns();
+        patterns = patterns.filter(p => p.id !== id);
+        renderPatterns();
     };
 
-    // --- 6. CAJA REGISTRADORA Y COMPARATIVA ---
-    document.getElementById('btn-accept-coin').addEventListener('click', () => {
-        if (detectedCoin) {
-            scannedTotal += detectedCoin.value;
-            updateBalance();
-        } else {
-            alert("No hay una moneda válida alineada en el círculo.");
-        }
-    });
+    // 2. SEGMENTACIÓN MULTI-OBJETO Y CLASIFICACIÓN EN LA ESCENA
+    function processMultiObjectFrame(targetCanvas, filterType, resultListId) {
+        if (!vCalib.videoWidth) return 0;
 
-    document.getElementById('btn-reset-scanned').addEventListener('click', () => {
-        scannedTotal = 0;
-        updateBalance();
-    });
+        targetCanvas.width = vCalib.videoWidth;
+        targetCanvas.height = vCalib.videoHeight;
+        const ctx = targetCanvas.getContext('2d');
+        ctx.drawImage(vCalib, 0, 0);
 
-    function updateBalance() {
-        const prodTotal = products.reduce((sum, p) => sum + p.price, 0);
-        document.getElementById('total-products').textContent = `$${prodTotal.toFixed(2)}`;
-        document.getElementById('total-scanned').textContent = `$${scannedTotal.toFixed(2)}`;
+        const w = targetCanvas.width;
+        const h = targetCanvas.height;
+        const raw = ctx.getImageData(0, 0, w, h);
+        const data = raw.data;
 
-        const balanceDiv = document.getElementById('balance-status');
-        const diff = scannedTotal - prodTotal;
+        // Cuadrícula de inspección espacial emulada (Grid Sampling)
+        const gridSize = 4;
+        const stepX = Math.floor(w / gridSize);
+        const stepY = Math.floor(h / gridSize);
+        const patchW = Math.floor(stepX * 0.7);
+        const patchH = Math.floor(stepY * 0.7);
 
-        if (prodTotal === 0 && scannedTotal === 0) {
-            balanceDiv.className = 'status-missing';
-            balanceDiv.textContent = "Esperando productos...";
-        } else if (diff >= 0) {
-            if (diff === 0) {
-                balanceDiv.className = 'status-exact';
-                balanceDiv.textContent = "¡Monto Exacto Cubierto!";
-            } else {
-                balanceDiv.className = 'status-covered';
-                balanceDiv.textContent = `¡Cubre Total! Cambio: $${diff.toFixed(2)}`;
+        let subtotal = 0;
+        const detectedItems = [];
+        const activePatterns = patterns.filter(p => p.type === filterType);
+
+        for (let gy = 0; gy < gridSize; gy++) {
+            for (let gx = 0; gx < gridSize; gx++) {
+                const x = gx * stepX + (stepX - patchW) / 2;
+                const y = gy * stepY + (stepY - patchH) / 2;
+
+                const patchData = ctx.getImageData(x, y, patchW, patchH);
+                const feat = computeFeatures(patchData);
+
+                // Detectar si la región contiene información (diferente a fondo neutro/oscuro)
+                if (feat && (feat.r + feat.g + feat.b > 50)) {
+                    let bestMatch = null;
+                    let minError = Infinity;
+
+                    for (let pat of activePatterns) {
+                        const dR = Math.abs(pat.r - feat.r);
+                        const dG = Math.abs(pat.g - feat.g);
+                        const dB = Math.abs(pat.b - feat.b);
+                        const dTex = Math.abs(pat.stdDev - feat.stdDev);
+                        const err = (dR + dG + dB) / 3 + dTex;
+
+                        if (err < minError) {
+                            minError = err;
+                            bestMatch = pat;
+                        }
+                    }
+
+                    // DIBUJAR BOUNDING BOX Y FILTROS
+                    ctx.lineWidth = 3;
+                    if (bestMatch && minError < thresholdQuality) {
+                        // Elemento reconocido y de calidad -> Verde/Azul
+                        ctx.strokeStyle = '#00e5ff';
+                        ctx.strokeRect(x, y, patchW, patchH);
+                        ctx.fillStyle = '#00e5ff';
+                        ctx.font = '16px monospace';
+                        ctx.fillText(`${bestMatch.name} ($${bestMatch.value})`, x, Math.max(16, y - 5));
+                        
+                        subtotal += bestMatch.value;
+                        detectedItems.push(bestMatch);
+                    } else if (bestMatch && minError >= thresholdQuality) {
+                        // Objeto que no cumple el estándar -> Tinte Naranja
+                        ctx.strokeStyle = '#ea580c';
+                        ctx.fillStyle = 'rgba(234, 88, 12, 0.45)';
+                        ctx.fillRect(x, y, patchW, patchH);
+                        ctx.strokeRect(x, y, patchW, patchH);
+                        ctx.fillStyle = '#ea580c';
+                        ctx.font = '14px monospace';
+                        ctx.fillText("DEFECTO / NO COINCIDE", x, Math.max(16, y - 5));
+                    }
+                }
             }
+        }
+
+        // Renderizar lista de detecciones
+        const rList = document.getElementById(resultListId);
+        rList.innerHTML = '';
+        detectedItems.forEach(item => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span>Identificado: ${item.name}</span><strong>+$${item.value.toFixed(2)}</strong>`;
+            rList.appendChild(li);
+        });
+
+        return subtotal;
+    }
+
+    // BOTONES DE ESCANEO MULTIPLE
+    document.getElementById('btn-scan-prod').addEventListener('click', () => {
+        totalProductsCost = processMultiObjectFrame(cProd, 'producto', 'detected-prod-list');
+        document.getElementById('total-prods').textContent = `$${totalProductsCost.toFixed(2)}`;
+        updateComparison();
+    });
+
+    document.getElementById('btn-scan-coin').addEventListener('click', () => {
+        totalCoinsValue = processMultiObjectFrame(cCoin, 'moneda', 'detected-coin-list');
+        document.getElementById('total-coins').textContent = `$${totalCoinsValue.toFixed(2)}`;
+        updateComparison();
+    });
+
+    function updateComparison() {
+        const diff = totalCoinsValue - totalProductsCost;
+        const stat = document.getElementById('final-status');
+
+        if (totalProductsCost === 0) {
+            stat.className = 'st-idle';
+            stat.textContent = 'Primero escanea los productos';
+            return;
+        }
+
+        if (diff >= 0) {
+            stat.className = 'st-ok';
+            stat.textContent = diff === 0 
+                ? '¡Pago exacto cubierto!' 
+                : `¡Total cubierto! Cambio a entregar: $${diff.toFixed(2)}`;
         } else {
-            balanceDiv.className = 'status-missing';
-            balanceDiv.textContent = `Falta dinero: $${Math.abs(diff).toFixed(2)}`;
+            stat.className = 'st-fail';
+            stat.textContent = `Falta dinero: $${Math.abs(diff).toFixed(2)}`;
         }
     }
 
-    // Inicio
-    initCamera();
-    video.addEventListener('play', () => {
-        processInspection();
-    });
+    startCamera();
 </script>
-
 </body>
 </html>
