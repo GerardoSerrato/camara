@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipeline de Visión Industrial: Clasificación y Cobro</title>
+    <title>Pipeline Visión Artificial - YOLO / OpenCV Emulado</title>
     <style>
         * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
         body {
-            background-color: #121212;
-            color: #ececec;
+            background-color: #0f172a;
+            color: #f8fafc;
             margin: 0;
             padding: 14px;
             overflow-y: auto;
@@ -16,9 +16,9 @@
             flex-direction: column;
             gap: 16px;
         }
-        h2 { margin: 0 0 10px 0; font-size: 1.05rem; color: #38bdf8; border-bottom: 1px solid #2a2a2a; padding-bottom: 6px; }
+        h2 { margin: 0 0 10px 0; font-size: 1.05rem; color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 6px; }
         .card {
-            background: #1c1c1e;
+            background: #1e293b;
             border-radius: 12px;
             padding: 14px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
@@ -40,14 +40,13 @@
             height: 100%;
             object-fit: cover;
         }
-        .roi-circle {
+        .roi-center {
             position: absolute;
-            width: 90px;
-            height: 90px;
-            border: 3px solid #00e5ff;
-            border-radius: 50%;
+            width: 100px;
+            height: 100px;
+            border: 2px dashed #38bdf8;
+            border-radius: 8px;
             pointer-events: none;
-            box-shadow: 0 0 10px #00e5ff;
         }
         .input-row {
             display: flex;
@@ -55,8 +54,8 @@
             margin-top: 10px;
         }
         input, select {
-            background: #2c2c2e;
-            border: 1px solid #444;
+            background: #334155;
+            border: 1px solid #475569;
             color: #fff;
             padding: 8px;
             border-radius: 6px;
@@ -67,7 +66,7 @@
             background: #2563eb;
             color: white;
             border: none;
-            padding: 9px 14px;
+            padding: 10px 14px;
             border-radius: 6px;
             font-weight: bold;
             font-size: 0.85rem;
@@ -80,8 +79,8 @@
         
         ul { list-style: none; padding: 0; margin: 10px 0 0 0; display: flex; flex-direction: column; gap: 6px; }
         li {
-            background: #27272a;
-            padding: 6px 10px;
+            background: #0f172a;
+            padding: 8px 10px;
             border-radius: 6px;
             display: flex;
             justify-content: space-between;
@@ -96,12 +95,12 @@
             margin-top: 10px;
         }
         .metric-box {
-            background: #27272a;
+            background: #0f172a;
             padding: 10px;
             border-radius: 8px;
             text-align: center;
         }
-        .metric-box span { display: block; font-size: 0.75rem; color: #9ca3af; }
+        .metric-box span { display: block; font-size: 0.75rem; color: #94a3b8; }
         .metric-box strong { font-size: 1.15rem; color: #fff; }
         
         #final-status {
@@ -114,77 +113,76 @@
         }
         .st-ok { background: #14532d; color: #86efac; }
         .st-fail { background: #7f1d1d; color: #fca5a5; }
-        .st-idle { background: #374151; color: #d1d5db; }
+        .st-idle { background: #334155; color: #cbd5e1; }
     </style>
 </head>
 <body>
 
-    <!-- PASO 1: CALIBRACIÓN INDIVIDUAL DE PATRONES -->
+    <!-- 1. CALIBRACIÓN Y REGISTRO DE PATRONES -->
     <div class="card">
-        <h2>1. Calibración de Patrones (1 a 1)</h2>
+        <h2>1. Calibración de Patrón (Coloca el objeto al centro)</h2>
         <div class="camera-box">
             <video id="v-calib" autoplay playsinline muted></video>
             <canvas id="c-calib"></canvas>
-            <div class="roi-circle"></div>
+            <div class="roi-center"></div>
         </div>
         <div class="input-row">
             <select id="pat-type">
                 <option value="producto">Producto</option>
                 <option value="moneda">Moneda</option>
             </select>
-            <input type="text" id="pat-name" placeholder="Nombre (ej. Goma, $5)">
-            <input type="number" id="pat-val" placeholder="Valor $" style="max-width: 80px;">
+            <input type="text" id="pat-name" placeholder="Nombre (ej. Resorte, $10)">
+            <input type="number" id="pat-val" placeholder="Precio / Valor $" style="max-width: 90px;">
         </div>
-        <button id="btn-save-pat" class="btn-green" style="width: 100%; margin-top: 8px;">Calibrar y Guardar Objeto</button>
+        <button id="btn-save-pat" class="btn-green" style="width: 100%; margin-top: 8px;">Guardar Patrón de Referencia</button>
         <ul id="patterns-list"></ul>
     </div>
 
-    <!-- PASO 2: ESCANEO MULTI-PRODUCTO (TODO EN LA ESCENA) -->
+    <!-- 2. DETECCIÓN YOLO/CV2 DE PRODUCTOS -->
     <div class="card">
-        <h2>2. Escaneo de Productos en Conjunto</h2>
+        <h2>2. Detección de Múltiples Productos (Escena Libre)</h2>
         <div class="camera-box">
             <canvas id="c-prod"></canvas>
         </div>
-        <button id="btn-scan-prod" style="width: 100%; margin-top: 8px;">Escanear Escena de Productos</button>
+        <button id="btn-scan-prod" style="width: 100%; margin-top: 8px;">Ejecutar Inferencia de Productos</button>
         <ul id="detected-prod-list"></ul>
     </div>
 
-    <!-- PASO 3: ESCANEO MULTI-MONEDA Y COMPARACIÓN -->
+    <!-- 3. DETECCIÓN YOLO/CV2 DE MONEDAS Y BALANCE -->
     <div class="card">
-        <h2>3. Escaneo de Monedas en Conjunto</h2>
+        <h2>3. Detección de Monedas y Control de Calidad</h2>
         <div class="camera-box">
             <canvas id="c-coin"></canvas>
         </div>
-        <button id="btn-scan-coin" class="btn-orange" style="width: 100%; margin-top: 8px;">Escanear Monedas y Validar</button>
+        <button id="btn-scan-coin" class="btn-orange" style="width: 100%; margin-top: 8px;">Escanear Monedas y Comparar</button>
         <ul id="detected-coin-list"></ul>
 
-        <!-- DASHBOARD DE TOTALES -->
         <div class="dashboard">
             <div class="metric-box">
                 <span>Total a Pagar</span>
                 <strong id="total-prods">$0.00</strong>
             </div>
             <div class="metric-box">
-                <span>Total Monedas</span>
+                <span>Total Monedas Válidas</span>
                 <strong id="total-coins">$0.00</strong>
             </div>
-            <div id="final-status" class="st-idle">Sin escaneos activos</div>
+            <div id="final-status" class="st-idle">Sin inferencias activas</div>
         </div>
     </div>
 
 <script>
-    let patterns = []; // { id, type, name, value, r, g, b, stdDev }
+    let patterns = [];
     let totalProductsCost = 0;
     let totalCoinsValue = 0;
 
-    const thresholdQuality = 35; // Umbral de rechazo / calidad
+    // Umbral de calidad: menor número exige mayor exactitud al patrón
+    const qualityThreshold = 38;
 
     const vCalib = document.getElementById('v-calib');
     const cCalib = document.getElementById('c-calib');
     const cProd = document.getElementById('c-prod');
     const cCoin = document.getElementById('c-coin');
 
-    // Inicializar Cámara Trasera
     async function startCamera() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
@@ -201,17 +199,9 @@
         }
     }
 
-    // 1. EXTRACCIÓN DE DESCRIPTORES DEL CÍRCULO CENTRAL (CALIBRACIÓN)
-    function extractROI(ctx, width, height) {
-        const size = Math.min(width, height) * 0.35;
-        const startX = (width - size) / 2;
-        const startY = (height - size) / 2;
-        const imgData = ctx.getImageData(startX, startY, size, size);
-        return computeFeatures(imgData);
-    }
-
-    function computeFeatures(imgData) {
-        const d = imgData.data;
+    // Extracción de vector de características (Color + Desviación/Textura)
+    function extractFeaturesFromData(imageData) {
+        const d = imageData.data;
         let r = 0, g = 0, b = 0, lum = 0;
         const n = d.length / 4;
         if (n === 0) return null;
@@ -226,6 +216,7 @@
             const l = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
             variance += Math.pow(l - avgLum, 2);
         }
+
         return {
             r: r / n,
             g: g / n,
@@ -234,7 +225,7 @@
         };
     }
 
-    // GUARDAR PATRÓN
+    // Guardar referencia del centro
     document.getElementById('btn-save-pat').addEventListener('click', () => {
         const type = document.getElementById('pat-type').value;
         const name = document.getElementById('pat-name').value.trim();
@@ -247,13 +238,18 @@
         const ctx = cCalib.getContext('2d');
         ctx.drawImage(vCalib, 0, 0);
 
-        const feat = extractROI(ctx, cCalib.width, cCalib.height);
-        if (!feat) return;
+        const size = Math.min(cCalib.width, cCalib.height) * 0.25;
+        const startX = (cCalib.width - size) / 2;
+        const startY = (cCalib.height - size) / 2;
+        const imgData = ctx.getImageData(startX, startY, size, size);
+        const feat = extractFeaturesFromData(imgData);
 
-        patterns.push({ id: Date.now(), type, name, value: val, ...feat });
-        document.getElementById('pat-name').value = '';
-        document.getElementById('pat-val').value = '';
-        renderPatterns();
+        if (feat) {
+            patterns.push({ id: Date.now(), type, name, value: val, ...feat });
+            document.getElementById('pat-name').value = '';
+            document.getElementById('pat-val').value = '';
+            renderPatterns();
+        }
     });
 
     function renderPatterns() {
@@ -274,8 +270,89 @@
         renderPatterns();
     };
 
-    // 2. SEGMENTACIÓN MULTI-OBJETO Y CLASIFICACIÓN EN LA ESCENA
-    function processMultiObjectFrame(targetCanvas, filterType, resultListId) {
+    // PIPELINE DE DETECCIÓN Y SEGMENTACIÓN TIPO CV2 (Connected Components + Bounding Boxes)
+    function findObjectsBoundingBoxes(ctx, width, height) {
+        // Reducción de resolución para análisis morfológico rápido
+        const scale = 0.25;
+        const sw = Math.floor(width * scale);
+        const sh = Math.floor(height * scale);
+
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = sw;
+        offCanvas.height = sh;
+        const offCtx = offCanvas.getContext('2d');
+        offCtx.drawImage(ctx.canvas, 0, 0, sw, sh);
+
+        const imgData = offCtx.getImageData(0, 0, sw, sh);
+        const data = imgData.data;
+
+        // Binarización por gradiente de contraste
+        const binary = new Uint8Array(sw * sh);
+        for (let i = 0; i < data.length; i += 4) {
+            const lum = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+            binary[i / 4] = lum > 45 ? 1 : 0; // Segmenta objetos sobre fondos oscuros o contrastados
+        }
+
+        // Etiquetado de regiones conectadas
+        const visited = new Uint8Array(sw * sh);
+        const boxes = [];
+        const minBoxArea = 80; // Filtrado de ruido visual
+
+        for (let y = 0; y < sh; y++) {
+            for (let x = 0; x < sw; x++) {
+                const idx = y * sw + x;
+                if (binary[idx] === 1 && !visited[idx]) {
+                    // Flood fill para encontrar límites del contorno
+                    let minX = x, maxX = x, minY = y, maxY = y;
+                    let queue = [x, y];
+                    visited[idx] = 1;
+                    let count = 0;
+
+                    while (queue.length > 0) {
+                        const cy = queue.pop();
+                        const cx = queue.pop();
+                        count++;
+
+                        if (cx < minX) minX = cx;
+                        if (cx > maxX) maxX = cx;
+                        if (cy < minY) minY = cy;
+                        if (cy > maxY) maxY = cy;
+
+                        const neighbors = [
+                            [cx+1, cy], [cx-1, cy], [cx, cy+1], [cx, cy-1]
+                        ];
+
+                        for (let [nx, ny] of neighbors) {
+                            if (nx >= 0 && nx < sw && ny >= 0 && ny < sh) {
+                                const nidx = ny * sw + nx;
+                                if (binary[nidx] === 1 && !visited[nidx]) {
+                                    visited[nidx] = 1;
+                                    queue.push(nx, ny);
+                                }
+                            }
+                        }
+                    }
+
+                    if (count > minBoxArea) {
+                        // Reescalar a coordenadas reales del frame
+                        const bw = (maxX - minX) / scale;
+                        const bh = (maxY - minY) / scale;
+                        const bx = minX / scale;
+                        const by = minY / scale;
+
+                        // Filtrar bounding boxes extremas o bordes de pantalla
+                        if (bw > 25 && bh > 25 && bw < width * 0.85 && bh < height * 0.85) {
+                            boxes.push({ x: bx, y: by, w: bw, h: bh });
+                        }
+                    }
+                }
+            }
+        }
+        return boxes;
+    }
+
+    // INFERENCIA Y ANÁLISIS DE CALIDAD SOBRE LAS BOUNDING BOXES
+    function runYoloInference(targetCanvas, filterType, resultListId) {
         if (!vCalib.videoWidth) return 0;
 
         targetCanvas.width = vCalib.videoWidth;
@@ -285,93 +362,89 @@
 
         const w = targetCanvas.width;
         const h = targetCanvas.height;
-        const raw = ctx.getImageData(0, 0, w, h);
-        const data = raw.data;
-
-        // Cuadrícula de inspección espacial emulada (Grid Sampling)
-        const gridSize = 4;
-        const stepX = Math.floor(w / gridSize);
-        const stepY = Math.floor(h / gridSize);
-        const patchW = Math.floor(stepX * 0.7);
-        const patchH = Math.floor(stepY * 0.7);
+        const boxes = findObjectsBoundingBoxes(ctx, w, h);
 
         let subtotal = 0;
         const detectedItems = [];
         const activePatterns = patterns.filter(p => p.type === filterType);
 
-        for (let gy = 0; gy < gridSize; gy++) {
-            for (let gx = 0; gx < gridSize; gx++) {
-                const x = gx * stepX + (stepX - patchW) / 2;
-                const y = gy * stepY + (stepY - patchH) / 2;
+        boxes.forEach(box => {
+            const crop = ctx.getImageData(
+                Math.max(0, Math.floor(box.x)),
+                Math.max(0, Math.floor(box.y)),
+                Math.min(w - box.x, Math.floor(box.w)),
+                Math.min(h - box.y, Math.floor(box.h))
+            );
 
-                const patchData = ctx.getImageData(x, y, patchW, patchH);
-                const feat = computeFeatures(patchData);
+            const feat = extractFeaturesFromData(crop);
+            let bestMatch = null;
+            let minError = Infinity;
 
-                // Detectar si la región contiene información (diferente a fondo neutro/oscuro)
-                if (feat && (feat.r + feat.g + feat.b > 50)) {
-                    let bestMatch = null;
-                    let minError = Infinity;
+            if (feat) {
+                for (let pat of activePatterns) {
+                    const dR = Math.abs(pat.r - feat.r);
+                    const dG = Math.abs(pat.g - feat.g);
+                    const dB = Math.abs(pat.b - feat.b);
+                    const dTex = Math.abs(pat.stdDev - feat.stdDev);
+                    const err = (dR + dG + dB) / 3 + dTex;
 
-                    for (let pat of activePatterns) {
-                        const dR = Math.abs(pat.r - feat.r);
-                        const dG = Math.abs(pat.g - feat.g);
-                        const dB = Math.abs(pat.b - feat.b);
-                        const dTex = Math.abs(pat.stdDev - feat.stdDev);
-                        const err = (dR + dG + dB) / 3 + dTex;
-
-                        if (err < minError) {
-                            minError = err;
-                            bestMatch = pat;
-                        }
-                    }
-
-                    // DIBUJAR BOUNDING BOX Y FILTROS
-                    ctx.lineWidth = 3;
-                    if (bestMatch && minError < thresholdQuality) {
-                        // Elemento reconocido y de calidad -> Verde/Azul
-                        ctx.strokeStyle = '#00e5ff';
-                        ctx.strokeRect(x, y, patchW, patchH);
-                        ctx.fillStyle = '#00e5ff';
-                        ctx.font = '16px monospace';
-                        ctx.fillText(`${bestMatch.name} ($${bestMatch.value})`, x, Math.max(16, y - 5));
-                        
-                        subtotal += bestMatch.value;
-                        detectedItems.push(bestMatch);
-                    } else if (bestMatch && minError >= thresholdQuality) {
-                        // Objeto que no cumple el estándar -> Tinte Naranja
-                        ctx.strokeStyle = '#ea580c';
-                        ctx.fillStyle = 'rgba(234, 88, 12, 0.45)';
-                        ctx.fillRect(x, y, patchW, patchH);
-                        ctx.strokeRect(x, y, patchW, patchH);
-                        ctx.fillStyle = '#ea580c';
-                        ctx.font = '14px monospace';
-                        ctx.fillText("DEFECTO / NO COINCIDE", x, Math.max(16, y - 5));
+                    if (err < minError) {
+                        minError = err;
+                        bestMatch = pat;
                     }
                 }
             }
-        }
 
-        // Renderizar lista de detecciones
+            ctx.lineWidth = 4;
+            if (bestMatch && minError < qualityThreshold) {
+                // OBJETO VÁLIDO / CONFORME (Bounding Box Verde-Cian)
+                ctx.strokeStyle = '#00e5ff';
+                ctx.strokeRect(box.x, box.y, box.w, box.h);
+
+                // Etiqueta YOLO
+                ctx.fillStyle = 'rgba(0, 229, 255, 0.85)';
+                ctx.fillRect(box.x, Math.max(0, box.y - 24), box.w, 24);
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.fillText(`${bestMatch.name} $${bestMatch.value}`, box.x + 6, Math.max(16, box.y - 6));
+
+                subtotal += bestMatch.value;
+                detectedItems.push(bestMatch);
+            } else {
+                // RECHAZO POR DEFECTO / NO RECONOCIDO (MÁSCARA Y CAJA NARANJA)
+                ctx.strokeStyle = '#ea580c';
+                ctx.fillStyle = 'rgba(234, 88, 12, 0.4)';
+                ctx.fillRect(box.x, box.y, box.w, box.h);
+                ctx.strokeRect(box.x, box.y, box.w, box.h);
+
+                ctx.fillStyle = 'rgba(234, 88, 12, 0.9)';
+                ctx.fillRect(box.x, Math.max(0, box.y - 24), box.w, 24);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 13px sans-serif';
+                ctx.fillText("NO CUMPLE CALIDAD", box.x + 6, Math.max(16, box.y - 6));
+            }
+        });
+
+        // Actualizar lista
         const rList = document.getElementById(resultListId);
         rList.innerHTML = '';
         detectedItems.forEach(item => {
             const li = document.createElement('li');
-            li.innerHTML = `<span>Identificado: ${item.name}</span><strong>+$${item.value.toFixed(2)}</strong>`;
+            li.innerHTML = `<span>Detectado: <strong>${item.name}</strong></span><strong>+$${item.value.toFixed(2)}</strong>`;
             rList.appendChild(li);
         });
 
         return subtotal;
     }
 
-    // BOTONES DE ESCANEO MULTIPLE
     document.getElementById('btn-scan-prod').addEventListener('click', () => {
-        totalProductsCost = processMultiObjectFrame(cProd, 'producto', 'detected-prod-list');
+        totalProductsCost = runYoloInference(cProd, 'producto', 'detected-prod-list');
         document.getElementById('total-prods').textContent = `$${totalProductsCost.toFixed(2)}`;
         updateComparison();
     });
 
     document.getElementById('btn-scan-coin').addEventListener('click', () => {
-        totalCoinsValue = processMultiObjectFrame(cCoin, 'moneda', 'detected-coin-list');
+        totalCoinsValue = runYoloInference(cCoin, 'moneda', 'detected-coin-list');
         document.getElementById('total-coins').textContent = `$${totalCoinsValue.toFixed(2)}`;
         updateComparison();
     });
@@ -382,7 +455,7 @@
 
         if (totalProductsCost === 0) {
             stat.className = 'st-idle';
-            stat.textContent = 'Primero escanea los productos';
+            stat.textContent = 'Primero detecta los productos a pagar';
             return;
         }
 
@@ -390,7 +463,7 @@
             stat.className = 'st-ok';
             stat.textContent = diff === 0 
                 ? '¡Pago exacto cubierto!' 
-                : `¡Total cubierto! Cambio a entregar: $${diff.toFixed(2)}`;
+                : `¡Total cubierto! Cambio: $${diff.toFixed(2)}`;
         } else {
             stat.className = 'st-fail';
             stat.textContent = `Falta dinero: $${Math.abs(diff).toFixed(2)}`;
