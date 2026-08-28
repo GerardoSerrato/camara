@@ -2,164 +2,249 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Emulación FPGA: Control de Calidad de Monedas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Cobro e Inspección de Monedas</title>
     <style>
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: white;
+            background-color: #121212;
+            color: #e0e0e0;
             margin: 0;
-            padding: 0;
+            padding: 16px;
+            overflow-y: auto; /* Scroll vertical habilitado */
             display: flex;
             flex-direction: column;
+            gap: 20px;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.15rem;
+            color: #4dabf7;
+            border-bottom: 1px solid #333;
+            padding-bottom: 8px;
+        }
+
+        .card {
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        input {
+            background-color: #2b2b2b;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            flex: 1;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            padding: 4px 10px;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+        }
+
+        .btn-secondary {
+            background-color: #495057;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        li {
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: flex-start;
-            height: 100vh;
-            overflow: hidden;
+            background: #262626;
+            padding: 10px 12px;
+            border-radius: 6px;
         }
 
-        header {
-            background-color: #333;
-            width: 100%;
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-        }
-
-        h1 { margin: 0; font-size: 1.2rem; }
-        p { margin: 5px 0 0; font-size: 0.9rem; color: #aaa; }
-
-        #container {
+        /* Contenedor de la cámara */
+        #camera-wrapper {
             position: relative;
             width: 100%;
-            flex-grow: 1;
+            height: 280px;
+            background-color: #000;
+            border-radius: 10px;
+            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
-            overflow: hidden;
         }
 
         video, canvas {
             position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Importante para llenar la pantalla */
+            object-fit: cover;
         }
 
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; /* Dejar pasar los clics */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* El área de inspección "hardcoded" */
         #inspection-zone {
-            width: 150px;
-            height: 150px;
-            border: 4px solid cyan;
-            border-radius: 50%;
-            box-shadow: 0 0 15px cyan;
-        }
-
-        #controls {
-            width: 100%;
-            padding: 20px;
-            background-color: #333;
-            display: flex;
-            justify-content: space-around;
-            box-shadow: 0 -2px 5px rgba(0,0,0,0.5);
-        }
-
-        button {
-            padding: 12px 24px;
-            font-size: 1rem;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        #btn-capture { background-color: #007bff; color: white; }
-        #btn-capture:hover { background-color: #0056b3; }
-
-        #btn-reset { background-color: #6c757d; color: white; }
-        #btn-reset:hover { background-color: #5a6268; }
-
-        /* Estilo para el estado de error (Rechazo) */
-        #container.rejected #inspection-zone {
-            border-color: orange;
-            box-shadow: 0 0 25px orange;
-        }
-
-        #container.rejected canvas {
-            filter: sepia(1) saturate(5) hue-rotate(-50deg); /* Filtro naranja */
-        }
-
-        #status {
             position: absolute;
-            bottom: 80px;
-            left: 20px;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 0.8rem;
+            width: 110px;
+            height: 110px;
+            border: 3px solid #00e5ff;
+            border-radius: 50%;
+            box-shadow: 0 0 12px #00e5ff;
+            pointer-events: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-        
-        .status-idle { background-color: #555; }
-        .status-ok { background-color: #28a745; }
-        .status-fail { background-color: #dc3545; }
 
+        #camera-wrapper.rejected #inspection-zone {
+            border-color: orange;
+            box-shadow: 0 0 20px orange;
+        }
+
+        #camera-wrapper.rejected canvas {
+            filter: sepia(1) saturate(6) hue-rotate(-50deg);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .metric {
+            background-color: #262626;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric span {
+            display: block;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .metric strong {
+            font-size: 1.25rem;
+            color: #fff;
+        }
+
+        #balance-status {
+            grid-column: span 2;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        .status-covered { background-color: #1b5e20; color: #a5d6a7; }
+        .status-missing { background-color: #b71c1c; color: #ffcdd2; }
+        .status-exact { background-color: #0d47a1; color: #bbdefb; }
     </style>
 </head>
 <body>
 
-<header>
-    <h1>Emulador FPGA: Inspector de Monedas</h1>
-    <p>Coloca la moneda en el círculo</p>
-</header>
-
-<div id="container">
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas"></canvas>
-    
-    <div id="overlay">
-        <div id="inspection-zone"></div>
+    <!-- SECCIÓN 1: CARRITO DE PRODUCTOS -->
+    <div class="card">
+        <h2>1. Productos a Cobrar</h2>
+        <div class="input-group">
+            <input type="text" id="prod-name" placeholder="Nombre (ej. Café)">
+            <input type="number" id="prod-price" placeholder="Precio ($)" style="max-width: 110px;">
+            <button id="btn-add-prod">Agregar</button>
+        </div>
+        <ul id="product-list"></ul>
     </div>
-    
-    <div id="status" class="status-idle">ESPERANDO EJEMPLO</div>
-</div>
 
-<div id="controls">
-    <button id="btn-capture">Capturar Ejemplo</button>
-    <button id="btn-reset">Reiniciar</button>
-</div>
+    <!-- SECCIÓN 2: CALIBRACIÓN DE MONEDAS PATRÓN -->
+    <div class="card">
+        <h2>2. Registrar Moneda de Ejemplo</h2>
+        <div class="input-group">
+            <input type="number" id="coin-value" placeholder="Valor ($ ej. 1, 2, 5, 10)">
+            <button id="btn-save-coin" class="btn-success">Guardar Patrón</button>
+        </div>
+        <p style="font-size: 0.8rem; color: #888; margin: 0 0 8px 0;">Patrones registrados:</p>
+        <ul id="coin-patterns-list"></ul>
+    </div>
+
+    <!-- SECCIÓN 3: ESCÁNER / INSPECTOR FPGA -->
+    <div class="card">
+        <h2>3. Escaneo e Inspección</h2>
+        <div id="camera-wrapper">
+            <video id="video" autoplay playsinline muted></video>
+            <canvas id="canvas"></canvas>
+            <div id="inspection-zone"></div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button id="btn-accept-coin" class="btn-success" style="flex: 2;">Aceptar Moneda Actual</button>
+            <button id="btn-reset-scanned" class="btn-secondary" style="flex: 1;">Vaciar Caja</button>
+        </div>
+
+        <div class="dashboard">
+            <div class="metric">
+                <span>Total Productos</span>
+                <strong id="total-products">$0.00</strong>
+            </div>
+            <div class="metric">
+                <span>Total Monedas</span>
+                <strong id="total-scanned">$0.00</strong>
+            </div>
+            <div id="balance-status" class="status-missing">Falta dinero: $0.00</div>
+        </div>
+    </div>
 
 <script>
+    // --- ESTADO GLOBAL ---
+    let products = [];
+    let coinPatterns = []; // { id, value, features }
+    let scannedTotal = 0;
+    let detectedCoin = null;
+
+    const threshold = 26; // Sensibilidad de textura/color
+
+    // --- ELEMENTOS DOM ---
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const container = document.getElementById('container');
-    const statusDiv = document.getElementById('status');
-    const btnCapture = document.getElementById('btn-capture');
-    const btnReset = document.getElementById('btn-reset');
+    const cameraWrapper = document.getElementById('camera-wrapper');
     const inspectionZone = document.getElementById('inspection-zone');
 
-    let examplePattern = null;
-    let isProcessing = false;
-    
-    // Umbral de sensibilidad: menor número = más estricto (prueba entre 15 y 30)
-    const threshold = 22; 
-
-    async function setupCamera() {
+    // --- 1. CONFIGURACIÓN DE CÁMARA TRASERA ---
+    async function initCamera() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: { exact: "environment" } },
@@ -167,50 +252,44 @@
             });
             video.srcObject = stream;
         } catch (err) {
-            try {
-                const fallbackStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" },
-                    audio: false
-                });
-                video.srcObject = fallbackStream;
-            } catch (fallbackErr) {
-                statusDiv.textContent = "ERROR DE CÁMARA";
-                statusDiv.className = "status-fail";
-            }
+            const fallbackStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" },
+                audio: false
+            });
+            video.srcObject = fallbackStream;
         }
     }
 
-    // Calcula el recorte exacto considerando el escalado 'cover'
+    // --- 2. PIPELINE DE EXTRACCIÓN DE CARACTERÍSTICAS ---
     function getInspectionZoneData() {
-        if (!video.videoWidth || !video.videoHeight) return null;
+        if (!video.videoWidth) return null;
 
-        const containerRect = container.getBoundingClientRect();
+        const wrapperRect = cameraWrapper.getBoundingClientRect();
         const zoneRect = inspectionZone.getBoundingClientRect();
 
         const videoRatio = video.videoWidth / video.videoHeight;
-        const containerRatio = containerRect.width / containerRect.height;
+        const wrapperRatio = wrapperRect.width / wrapperRect.height;
 
         let renderedWidth, renderedHeight, offsetX, offsetY;
 
-        if (containerRatio > videoRatio) {
-            renderedWidth = containerRect.width;
-            renderedHeight = containerRect.width / videoRatio;
+        if (wrapperRatio > videoRatio) {
+            renderedWidth = wrapperRect.width;
+            renderedHeight = wrapperRect.width / videoRatio;
             offsetX = 0;
-            offsetY = (renderedHeight - containerRect.height) / 2;
+            offsetY = (renderedHeight - wrapperRect.height) / 2;
         } else {
-            renderedWidth = containerRect.height * videoRatio;
-            renderedHeight = containerRect.height;
-            offsetX = (renderedWidth - containerRect.width) / 2;
+            renderedWidth = wrapperRect.height * videoRatio;
+            renderedHeight = wrapperRect.height;
+            offsetX = (renderedWidth - wrapperRect.width) / 2;
             offsetY = 0;
         }
 
         const scale = video.videoWidth / renderedWidth;
-        const x = (zoneRect.left - containerRect.left + offsetX) * scale;
-        const y = (zoneRect.top - containerRect.top + offsetY) * scale;
+        const x = (zoneRect.left - wrapperRect.left + offsetX) * scale;
+        const y = (zoneRect.top - wrapperRect.top + offsetY) * scale;
         const width = zoneRect.width * scale;
         const height = zoneRect.height * scale;
 
-        // Extraer los píxeles de la zona central
         return ctx.getImageData(
             Math.max(0, Math.floor(x)), 
             Math.max(0, Math.floor(y)), 
@@ -219,7 +298,6 @@
         );
     }
 
-    // Extrae un vector de características (promedio + desviación de brillo)
     function extractFeatures(imageData) {
         if (!imageData) return null;
         const data = imageData.data;
@@ -237,43 +315,21 @@
         let variance = 0;
 
         for (let i = 0; i < data.length; i += 4) {
-            const pixelBrightness = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-            variance += Math.pow(pixelBrightness - avgBrightness, 2);
+            const pb = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+            variance += Math.pow(pb - avgBrightness, 2);
         }
 
         return {
             r: r / totalPixels,
             g: g / totalPixels,
             b: b / totalPixels,
-            stdDev: Math.sqrt(variance / totalPixels) // Detecta relieves y texturas
+            stdDev: Math.sqrt(variance / totalPixels)
         };
     }
 
-    function captureExample() {
-        if (!video.videoWidth) return;
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const zoneData = getInspectionZoneData();
-        examplePattern = extractFeatures(zoneData);
-
-        statusDiv.textContent = "EJEMPLO CAPTURADO";
-        statusDiv.className = "status-ok";
-        btnCapture.textContent = "Recapturar Ejemplo";
-    }
-
-    function resetSystem() {
-        examplePattern = null;
-        statusDiv.textContent = "ESPERANDO EJEMPLO";
-        statusDiv.className = "status-idle";
-        btnCapture.textContent = "Capturar Ejemplo";
-        container.classList.remove('rejected');
-    }
-
-    function processFrame() {
-        if (isProcessing && video.readyState === video.HAVE_ENOUGH_DATA) {
+    // --- 3. BUCLE DE PROCESAMIENTO DETERMINISTA ---
+    function processInspection() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
             if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -281,43 +337,160 @@
 
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            if (examplePattern) {
-                const currentData = getInspectionZoneData();
-                const currentFeatures = extractFeatures(currentData);
+            const currentData = getInspectionZoneData();
+            const currentFeatures = extractFeatures(currentData);
 
-                if (currentFeatures) {
-                    const diffR = Math.abs(examplePattern.r - currentFeatures.r);
-                    const diffG = Math.abs(examplePattern.g - currentFeatures.g);
-                    const diffB = Math.abs(examplePattern.b - currentFeatures.b);
-                    const diffTexture = Math.abs(examplePattern.stdDev - currentFeatures.stdDev);
+            if (currentFeatures && coinPatterns.length > 0) {
+                let bestMatch = null;
+                let lowestError = Infinity;
 
-                    // Puntuación combinada de color y textura/relieve
+                for (let pattern of coinPatterns) {
+                    const diffR = Math.abs(pattern.features.r - currentFeatures.r);
+                    const diffG = Math.abs(pattern.features.g - currentFeatures.g);
+                    const diffB = Math.abs(pattern.features.b - currentFeatures.b);
+                    const diffTexture = Math.abs(pattern.features.stdDev - currentFeatures.stdDev);
+
                     const totalError = (diffR + diffG + diffB) / 3 + diffTexture;
 
-                    if (totalError < threshold) {
-                        container.classList.remove('rejected');
-                        statusDiv.textContent = `OK (Error: ${Math.round(totalError)})`;
-                        statusDiv.className = "status-ok";
-                    } else {
-                        container.classList.add('rejected');
-                        statusDiv.textContent = `RECHAZO (Error: ${Math.round(totalError)})`;
-                        statusDiv.className = "status-fail";
+                    if (totalError < lowestError) {
+                        lowestError = totalError;
+                        bestMatch = pattern;
                     }
                 }
+
+                if (lowestError < threshold) {
+                    // Moneda válida identificada
+                    cameraWrapper.classList.remove('rejected');
+                    detectedCoin = bestMatch;
+                } else {
+                    // Moneda rechazada / sin coincidencia
+                    cameraWrapper.classList.add('rejected');
+                    detectedCoin = null;
+                }
+            } else {
+                cameraWrapper.classList.remove('rejected');
+                detectedCoin = null;
             }
         }
-        requestAnimationFrame(processFrame);
+        requestAnimationFrame(processInspection);
     }
 
-    video.addEventListener('play', () => {
-        isProcessing = true;
-        processFrame();
+    // --- 4. GESTIÓN DE PRODUCTOS Y TOTALES ---
+    document.getElementById('btn-add-prod').addEventListener('click', () => {
+        const nameInput = document.getElementById('prod-name');
+        const priceInput = document.getElementById('prod-price');
+        const name = nameInput.value.trim();
+        const price = parseFloat(priceInput.value);
+
+        if (!name || isNaN(price) || price <= 0) return;
+
+        products.push({ id: Date.now(), name, price });
+        nameInput.value = '';
+        priceInput.value = '';
+        renderProducts();
+        updateBalance();
     });
 
-    btnCapture.addEventListener('click', captureExample);
-    btnReset.addEventListener('click', resetSystem);
+    function renderProducts() {
+        const list = document.getElementById('product-list');
+        list.innerHTML = '';
+        products.forEach(p => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>${p.name} - <strong>$${p.price.toFixed(2)}</strong></span>
+                <button class="btn-danger" onclick="removeProduct(${p.id})">✕</button>
+            `;
+            list.appendChild(li);
+        });
+    }
 
-    setupCamera();
+    window.removeProduct = function(id) {
+        products = products.filter(p => p.id !== id);
+        renderProducts();
+        updateBalance();
+    };
+
+    // --- 5. REGISTRO DE MONEDAS PATRÓN ---
+    document.getElementById('btn-save-coin').addEventListener('click', () => {
+        const valInput = document.getElementById('coin-value');
+        const val = parseFloat(valInput.value);
+
+        if (isNaN(val) || val <= 0) return;
+
+        const zoneData = getInspectionZoneData();
+        const features = extractFeatures(zoneData);
+
+        if (features) {
+            coinPatterns.push({ id: Date.now(), value: val, features });
+            valInput.value = '';
+            renderCoinPatterns();
+        }
+    });
+
+    function renderCoinPatterns() {
+        const list = document.getElementById('coin-patterns-list');
+        list.innerHTML = '';
+        coinPatterns.forEach(c => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span>Patrón Moneda: <strong>$${c.value.toFixed(2)}</strong></span>
+                <button class="btn-danger" onclick="removePattern(${c.id})">✕</button>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    window.removePattern = function(id) {
+        coinPatterns = coinPatterns.filter(c => c.id !== id);
+        renderCoinPatterns();
+    };
+
+    // --- 6. CAJA REGISTRADORA Y COMPARATIVA ---
+    document.getElementById('btn-accept-coin').addEventListener('click', () => {
+        if (detectedCoin) {
+            scannedTotal += detectedCoin.value;
+            updateBalance();
+        } else {
+            alert("No hay una moneda válida alineada en el círculo.");
+        }
+    });
+
+    document.getElementById('btn-reset-scanned').addEventListener('click', () => {
+        scannedTotal = 0;
+        updateBalance();
+    });
+
+    function updateBalance() {
+        const prodTotal = products.reduce((sum, p) => sum + p.price, 0);
+        document.getElementById('total-products').textContent = `$${prodTotal.toFixed(2)}`;
+        document.getElementById('total-scanned').textContent = `$${scannedTotal.toFixed(2)}`;
+
+        const balanceDiv = document.getElementById('balance-status');
+        const diff = scannedTotal - prodTotal;
+
+        if (prodTotal === 0 && scannedTotal === 0) {
+            balanceDiv.className = 'status-missing';
+            balanceDiv.textContent = "Esperando productos...";
+        } else if (diff >= 0) {
+            if (diff === 0) {
+                balanceDiv.className = 'status-exact';
+                balanceDiv.textContent = "¡Monto Exacto Cubierto!";
+            } else {
+                balanceDiv.className = 'status-covered';
+                balanceDiv.textContent = `¡Cubre Total! Cambio: $${diff.toFixed(2)}`;
+            }
+        } else {
+            balanceDiv.className = 'status-missing';
+            balanceDiv.textContent = `Falta dinero: $${Math.abs(diff).toFixed(2)}`;
+        }
+    }
+
+    // Inicio
+    initCamera();
+    video.addEventListener('play', () => {
+        processInspection();
+    });
 </script>
+
 </body>
 </html>
